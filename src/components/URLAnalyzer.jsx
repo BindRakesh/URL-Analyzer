@@ -20,7 +20,7 @@ const URLAnalyzer = () => {
     setExpandedChains({});
 
     // const backendUrl = process?.env?.REACT_APP_BACKEND_URL || 'ws://localhost:5000/analyze';
-    // const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze';
+    // const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze'; //render
     const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze';
 
     const websocket = new WebSocket(backendUrl);
