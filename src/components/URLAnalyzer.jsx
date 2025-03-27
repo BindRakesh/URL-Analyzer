@@ -152,7 +152,7 @@ const URLAnalyzer = () => {
             rows="5"
             value={urls}
             onChange={(e) => setUrls(e.target.value)}
-            placeholder="Enter URLs (one per line), e.g., google.com or https://example.com"
+            placeholder="Enter URLs (one per line), e.g., google.com or http://www.bmw.in"
             disabled={isLoading}
           />
           <div className="flex gap-2">
