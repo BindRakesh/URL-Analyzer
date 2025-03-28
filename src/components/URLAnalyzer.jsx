@@ -20,9 +20,8 @@ const URLAnalyzer = () => {
     setExpandedChains({});
 
     // const backendUrl = process?.env?.REACT_APP_BACKEND_URL || 'ws://localhost:5000/analyze';
-    // const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze'; //render
+    // const backendUrl = 'wss://url-analyzer-be.onrender.com/analyze';
     const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze';
-
     const websocket = new WebSocket(backendUrl);
     setWs(websocket);
 
@@ -153,7 +152,7 @@ const URLAnalyzer = () => {
             rows="5"
             value={urls}
             onChange={(e) => setUrls(e.target.value)}
-            placeholder="Enter URLs (one per line), e.g., google.com or https://example.com"
+            placeholder="Enter URLs (one per line), e.g., google.com or http://www.bmw.in"
             disabled={isLoading}
           />
           <div className="flex gap-2">
