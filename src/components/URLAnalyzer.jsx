@@ -11,11 +11,11 @@ const URLAnalyzer = () => {
   const [expandedChains, setExpandedChains] = useState({});
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [currentProcessingUrl, setCurrentProcessingUrl] = useState('');
-  // Progress tracking states
   const [totalUrls, setTotalUrls] = useState(0);
   const [analyzedUrls, setAnalyzedUrls] = useState(0);
   const [averageTimePerUrl, setAverageTimePerUrl] = useState(0);
   const [startTime, setStartTime] = useState(null);
+  const [actualTimeTaken, setActualTimeTaken] = useState(0); // Track actual time taken
 
   const analyzeURLs = () => {
     if (ws) ws.close();
@@ -25,12 +25,11 @@ const URLAnalyzer = () => {
     setResults([]);
     setExpandedChains({});
     setCurrentProcessingUrl('');
-    // Reset progress tracking
     setAnalyzedUrls(0);
     setAverageTimePerUrl(0);
     setStartTime(null);
+    setActualTimeTaken(0);
 
-    // Calculate total URLs
     const urlList = urls.split('\n').filter(url => url.trim());
     setTotalUrls(urlList.length);
 
@@ -41,7 +40,7 @@ const URLAnalyzer = () => {
     websocket.onopen = () => {
       console.log("WebSocket connected");
       websocket.send(JSON.stringify({ urls: urlList }));
-      setStartTime(Date.now()); // Start timing
+      setStartTime(Date.now());
     };
 
     websocket.onmessage = (event) => {
@@ -52,6 +51,11 @@ const URLAnalyzer = () => {
         setCurrentProcessingUrl('');
         websocket.close();
         setUrls('');
+        // Calculate final actual time taken
+        if (startTime) {
+          const elapsedTime = (Date.now() - startTime) / 1000;
+          setActualTimeTaken(elapsedTime);
+        }
       } else if (data.error) {
         setError(data.error);
         setIsLoading(false);
@@ -60,16 +64,15 @@ const URLAnalyzer = () => {
       } else if (data.status === "processing") {
         setCurrentProcessingUrl(data.url);
       } else {
-        // Add result and update progress
         setResults((prev) => [...prev, { ...data, isAnalyzing: false }]);
         setCurrentProcessingUrl('');
         setAnalyzedUrls((prev) => {
           const newCount = prev + 1;
-          // Calculate average time per URL
           if (newCount > 0 && startTime) {
-            const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
+            const elapsedTime = (Date.now() - startTime) / 1000;
             const avgTime = elapsedTime / newCount;
             setAverageTimePerUrl(avgTime);
+            setActualTimeTaken(elapsedTime);
           }
           return newCount;
         });
@@ -152,9 +155,16 @@ const URLAnalyzer = () => {
   const etaSeconds = remainingUrls * averageTimePerUrl;
   const etaDisplay = etaSeconds > 0 ? `~${Math.ceil(etaSeconds)} seconds` : 'Calculating...';
 
+  // Format actual time taken in minutes:seconds
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
   return (
     <div className={`min-h-screen w-full flex flex-col transition-colors duration-300 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
-      <header className="sticky top-0 z-10 flex justify-between items-center p-6 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+      <header className="sticky top-0 z-20 flex justify-between items-center p-6 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">URL Journey</h1>
         <div className="flex items-center gap-4">
           <a
@@ -335,15 +345,24 @@ const URLAnalyzer = () => {
           )}
         </div>
 
-        {/* Progress Sidebar (Right Side) */}
-        {isLoading && totalUrls > 0 && (
-          <div className="fixed right-0 top-0 h-full w-64 p-6 bg-gray-200 dark:bg-gray-800 shadow-lg z-20">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Progress</h2>
+        {/* Progress Sidebar (Right Side, Below Header) */}
+        {totalUrls > 0 && (
+          <div className="fixed right-4 top-24 w-72 p-6 bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-lg shadow-lg z-10 max-h-[calc(100vh-6rem)] overflow-y-auto">
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Analysis Progress</h2>
             <div className="mb-4">
-              <div className="w-full bg-gray-300 dark:bg-gray-600 rounded-full h-4">
+              <div className="relative w-full bg-gray-300 dark:bg-gray-600 rounded-full h-4 overflow-hidden">
                 <div
-                  className="bg-blue-600 dark:bg-blue-500 h-4 rounded-full"
-                  style={{ width: `${progressPercentage}%` }}
+                  className={`absolute top-0 left-0 h-4 rounded-full transition-all duration-500 ease-in-out ${
+                    isLoading ? 'animate-pulse' : ''
+                  }`}
+                  style={{
+                    width: `${progressPercentage}%`,
+                    background: isLoading
+                      ? 'linear-gradient(90deg, #3B82F6, #60A5FA, #3B82F6)'
+                      : 'linear-gradient(90deg, #10B981, #34D399, #10B981)',
+                    backgroundSize: '200% 100%',
+                    animation: isLoading ? 'gradientMove 2s linear infinite' : 'none',
+                  }}
                 ></div>
               </div>
               <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
@@ -352,13 +371,32 @@ const URLAnalyzer = () => {
               <p className="text-sm text-gray-700 dark:text-gray-300">
                 Remaining: {remainingUrls} URLs
               </p>
+              {isLoading && (
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  ETA: {etaDisplay}
+                </p>
+              )}
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                ETA: {etaDisplay}
+                Time Taken: {formatTime(actualTimeTaken)}
               </p>
             </div>
           </div>
         )}
       </div>
+
+      {/* Add CSS for the gradient animation */}
+      <style>
+        {`
+          @keyframes gradientMove {
+            0% {
+              background-position: 0% 50%;
+            }
+            100% {
+              background-position: 200% 50%;
+            }
+          }
+        `}
+      </style>
     </div>
   );
 };
