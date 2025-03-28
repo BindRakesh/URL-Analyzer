@@ -10,6 +10,7 @@ const URLAnalyzer = () => {
   const [ws, setWs] = useState(null);
   const [expandedChains, setExpandedChains] = useState({});
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [currentProcessingUrl, setCurrentProcessingUrl] = useState(''); // Track the URL being processed
 
   const analyzeURLs = () => {
     if (ws) ws.close();
@@ -18,47 +19,53 @@ const URLAnalyzer = () => {
     setError('');
     setResults([]);
     setExpandedChains({});
+    setCurrentProcessingUrl('');
 
-    
-    // const backendUrl = process?.env?.REACT_APP_BACKEND_URL || 'ws://localhost:5000/analyze';
-    // const backendUrl = 'wss://url-analyzer-be.onrender.com/analyze';
     const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze';
     const websocket = new WebSocket(backendUrl);
     setWs(websocket);
 
-    // Add debug logs for troubleshooting
-websocket.onopen = () => console.log("WebSocket connected");
-websocket.onerror = (error) => console.error("WebSocket error:", error);
-websocket.onmessage = (event) => console.log("Received:", event.data);
-
     websocket.onopen = () => {
+      console.log("WebSocket connected");
       websocket.send(JSON.stringify({
         urls: urls.split('\n').filter(url => url.trim())
       }));
     };
 
     websocket.onmessage = (event) => {
+      console.log("Received:", event.data);
       const data = JSON.parse(event.data);
       if (data.done) {
         setIsLoading(false);
+        setCurrentProcessingUrl('');
         websocket.close();
         setUrls('');
       } else if (data.error) {
         setError(data.error);
         setIsLoading(false);
+        setCurrentProcessingUrl('');
         websocket.close();
+      } else if (data.status === "processing") {
+        // Update the processing status instead of adding to results
+        setCurrentProcessingUrl(data.url);
       } else {
+        // Only add actual results to the results array
         setResults((prev) => [...prev, { ...data, isAnalyzing: false }]);
+        setCurrentProcessingUrl(''); // Clear processing status after result
       }
     };
 
     websocket.onerror = () => {
       setError('Failed to connect to the server or connection interrupted');
       setIsLoading(false);
+      setCurrentProcessingUrl('');
       websocket.close();
     };
 
-    websocket.onclose = () => setIsLoading(false);
+    websocket.onclose = () => {
+      setIsLoading(false);
+      setCurrentProcessingUrl('');
+    };
   };
 
   const pasteFromClipboard = async () => {
@@ -178,6 +185,12 @@ websocket.onmessage = (event) => console.log("Received:", event.data);
             </button>
           </div>
         </div>
+
+        {currentProcessingUrl && (
+          <div className="mb-6 p-4 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-lg shadow">
+            <strong>Processing:</strong> {currentProcessingUrl}
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg shadow">
