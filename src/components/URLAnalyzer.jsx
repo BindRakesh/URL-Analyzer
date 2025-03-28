@@ -19,12 +19,17 @@ const URLAnalyzer = () => {
     setResults([]);
     setExpandedChains({});
 
-    const API_KEY = "secret-api-key-mai-nahi-bataunga";
+    
     // const backendUrl = process?.env?.REACT_APP_BACKEND_URL || 'ws://localhost:5000/analyze';
     // const backendUrl = 'wss://url-analyzer-be.onrender.com/analyze';
-    const backendUrl = 'wss://web-production-a69a9.up.railway.app/?api_key=${API_KEY}';
+    const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze';
     const websocket = new WebSocket(backendUrl);
     setWs(websocket);
+
+    // Add debug logs for troubleshooting
+websocket.onopen = () => console.log("WebSocket connected");
+websocket.onerror = (error) => console.error("WebSocket error:", error);
+websocket.onmessage = (event) => console.log("Received:", event.data);
 
     websocket.onopen = () => {
       websocket.send(JSON.stringify({
