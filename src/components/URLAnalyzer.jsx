@@ -10,7 +10,12 @@ const URLAnalyzer = () => {
   const [ws, setWs] = useState(null);
   const [expandedChains, setExpandedChains] = useState({});
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
-  const [currentProcessingUrl, setCurrentProcessingUrl] = useState(''); // Track the URL being processed
+  const [currentProcessingUrl, setCurrentProcessingUrl] = useState('');
+  // Progress tracking states
+  const [totalUrls, setTotalUrls] = useState(0);
+  const [analyzedUrls, setAnalyzedUrls] = useState(0);
+  const [averageTimePerUrl, setAverageTimePerUrl] = useState(0);
+  const [startTime, setStartTime] = useState(null);
 
   const analyzeURLs = () => {
     if (ws) ws.close();
@@ -20,6 +25,14 @@ const URLAnalyzer = () => {
     setResults([]);
     setExpandedChains({});
     setCurrentProcessingUrl('');
+    // Reset progress tracking
+    setAnalyzedUrls(0);
+    setAverageTimePerUrl(0);
+    setStartTime(null);
+
+    // Calculate total URLs
+    const urlList = urls.split('\n').filter(url => url.trim());
+    setTotalUrls(urlList.length);
 
     const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze';
     const websocket = new WebSocket(backendUrl);
@@ -27,9 +40,8 @@ const URLAnalyzer = () => {
 
     websocket.onopen = () => {
       console.log("WebSocket connected");
-      websocket.send(JSON.stringify({
-        urls: urls.split('\n').filter(url => url.trim())
-      }));
+      websocket.send(JSON.stringify({ urls: urlList }));
+      setStartTime(Date.now()); // Start timing
     };
 
     websocket.onmessage = (event) => {
@@ -46,12 +58,21 @@ const URLAnalyzer = () => {
         setCurrentProcessingUrl('');
         websocket.close();
       } else if (data.status === "processing") {
-        // Update the processing status instead of adding to results
         setCurrentProcessingUrl(data.url);
       } else {
-        // Only add actual results to the results array
+        // Add result and update progress
         setResults((prev) => [...prev, { ...data, isAnalyzing: false }]);
-        setCurrentProcessingUrl(''); // Clear processing status after result
+        setCurrentProcessingUrl('');
+        setAnalyzedUrls((prev) => {
+          const newCount = prev + 1;
+          // Calculate average time per URL
+          if (newCount > 0 && startTime) {
+            const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
+            const avgTime = elapsedTime / newCount;
+            setAverageTimePerUrl(avgTime);
+          }
+          return newCount;
+        });
       }
     };
 
@@ -125,6 +146,12 @@ const URLAnalyzer = () => {
     return () => ws && ws.close();
   }, [theme, ws]);
 
+  // Calculate progress and ETA
+  const progressPercentage = totalUrls > 0 ? (analyzedUrls / totalUrls) * 100 : 0;
+  const remainingUrls = totalUrls - analyzedUrls;
+  const etaSeconds = remainingUrls * averageTimePerUrl;
+  const etaDisplay = etaSeconds > 0 ? `~${Math.ceil(etaSeconds)} seconds` : 'Calculating...';
+
   return (
     <div className={`min-h-screen w-full flex flex-col transition-colors duration-300 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
       <header className="sticky top-0 z-10 flex justify-between items-center p-6 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
@@ -158,149 +185,176 @@ const URLAnalyzer = () => {
         </div>
       </header>
 
-      <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
-        <div className="mb-6 flex flex-col gap-2">
-          <textarea
-            className="w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y bg-white dark:bg-gray-800 text-gray-800 dark:text-white border-gray-300 dark:border-gray-600"
-            rows="5"
-            value={urls}
-            onChange={(e) => setUrls(e.target.value)}
-            placeholder="Enter URLs (one per line), e.g., google.com or http://www.bmw.in"
-            disabled={isLoading}
-          />
-          <div className="flex gap-2">
-            <button
-              className={`flex-1 py-2 rounded-lg text-white font-semibold ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'} transition-colors`}
-              onClick={analyzeURLs}
+      <div className="flex-1 flex relative">
+        {/* Main Content */}
+        <div className="p-6 max-w-4xl mx-auto w-full">
+          <div className="mb-6 flex flex-col gap-2">
+            <textarea
+              className="w-full p-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y bg-white dark:bg-gray-800 text-gray-800 dark:text-white border-gray-300 dark:border-gray-600"
+              rows="5"
+              value={urls}
+              onChange={(e) => setUrls(e.target.value)}
+              placeholder="Enter URLs (one per line), e.g., google.com or http://www.bmw.in"
               disabled={isLoading}
-            >
-              {isLoading ? 'Analyzing...' : 'Analyze URLs'}
-            </button>
-            <button
-              className="py-2 px-4 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-semibold transition-colors"
-              onClick={pasteFromClipboard}
-              disabled={isLoading}
-            >
-              Paste from Clipboard
-            </button>
-          </div>
-        </div>
-
-        {currentProcessingUrl && (
-          <div className="mb-6 p-4 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-lg shadow">
-            <strong>Processing:</strong> {currentProcessingUrl}
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg shadow">
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-
-        {results.length > 0 && (
-          <div className="mb-6">
-            <div className="flex justify-end gap-2 mb-4 flex-wrap">
+            />
+            <div className="flex gap-2">
               <button
-                className="py-2 px-4 rounded-lg bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold transition-colors"
-                onClick={() => exportResults('json')}
+                className={`flex-1 py-2 rounded-lg text-white font-semibold ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'} transition-colors`}
+                onClick={analyzeURLs}
+                disabled={isLoading}
               >
-                Export as JSON
+                {isLoading ? 'Analyzing...' : 'Analyze URLs'}
               </button>
               <button
-                className="py-2 px-4 rounded-lg bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold transition-colors"
-                onClick={() => exportResults('csv')}
+                className="py-2 px-4 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-semibold transition-colors"
+                onClick={pasteFromClipboard}
+                disabled={isLoading}
               >
-                Export as CSV
-              </button>
-              <button
-                className="py-2 px-4 rounded-lg bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold transition-colors"
-                onClick={() => exportResults('excel')}
-              >
-                Export as Excel
+                Paste from Clipboard
               </button>
             </div>
+          </div>
 
-            <div className="space-y-6">
-              {results.map((result, index) => (
-                <div key={index} className="p-4 border rounded-lg shadow-sm bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 relative">
-                  {result.isAnalyzing && (
-                    <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 animate-pulse" />
-                  )}
-                  <div className="text-lg font-semibold text-gray-800 dark:text-white">
-                    <strong>Original URL:</strong>{' '}
-                    <a href={result.originalURL} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-                      {result.originalURL}
-                    </a>
-                  </div>
-                  {result.error ? (
-                    <div className="mt-2 text-red-600 dark:text-red-400">Error: {result.error}</div>
-                  ) : (
-                    <>
-                      <div className="mt-2 text-gray-800 dark:text-white">
-                        <strong>Final URL:</strong>{' '}
-                        <a href={result.finalURL} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-                          {result.finalURL}
-                        </a>
-                      </div>
-                      <div className="mt-2 text-gray-800 dark:text-white">
-                        <strong>Total Time:</strong>{' '}
-                        {result.totalTime !== undefined ? `${result.totalTime.toFixed(2)} seconds` : 'N/A'}
-                      </div>
-                      {result.redirectChain?.length > 0 && (
-                        <div className="mt-3">
-                          <button
-                            className="font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
-                            onClick={() => toggleChain(index)}
-                          >
-                            <span>Redirect Chain</span>
-                            <span>{expandedChains[index] ? '▼' : '▶'}</span>
-                          </button>
-                          {expandedChains[index] && (
-                            <div className="mt-2 space-y-4">
-                              {result.redirectChain.map((hop, idx) => (
-                                <div key={idx} className="relative pl-10">
-                                  <div className="absolute left-4 top-0 w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-300 font-semibold z-10">
-                                    {idx + 1}
-                                  </div>
-                                  {idx < result.redirectChain.length - 1 && (
-                                    <div className="absolute left-[1.65rem] top-6 h-[calc(100%-1rem)] w-0.5 bg-gray-300 dark:bg-gray-600" />
-                                  )}
-                                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm text-gray-800 dark:text-white">
-                                    <div className="truncate" title={hop.url}>
-                                      <strong>URL:</strong>{' '}
-                                      <a href={hop.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-                                        {hop.url}
-                                      </a>
-                                    </div>
-                                    <div>
-                                      <strong>Status:</strong>{' '}
-                                      <span className={`px-2 py-1 rounded ${
-                                        hop.status === 200 ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
-                                        hop.status >= 300 && hop.status < 400 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' :
-                                        'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                                      }`}>
-                                        {hop.status ?? 'Unknown'}
-                                      </span>
-                                    </div>
-                                    <div>
-                                      <strong>Server:</strong> {hop.server ?? 'Unknown'}
-                                    </div>
-                                    <div>
-                                      <strong>Time:</strong> {hop.timestamp !== undefined ? `${hop.timestamp.toFixed(2)}s` : 'N/A'}
-                                    </div>
-                                    {hop.error && <div className="text-red-600 dark:text-red-400">Error: {hop.error}</div>}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+          {currentProcessingUrl && (
+            <div className="mb-6 p-4 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-lg shadow">
+              <strong>Processing:</strong> {currentProcessingUrl}
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg shadow">
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
+          {results.length > 0 && (
+            <div className="mb-6">
+              <div className="flex justify-end gap-2 mb-4 flex-wrap">
+                <button
+                  className="py-2 px-4 rounded-lg bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold transition-colors"
+                  onClick={() => exportResults('json')}
+                >
+                  Export as JSON
+                </button>
+                <button
+                  className="py-2 px-4 rounded-lg bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold transition-colors"
+                  onClick={() => exportResults('csv')}
+                >
+                  Export as CSV
+                </button>
+                <button
+                  className="py-2 px-4 rounded-lg bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 text-white font-semibold transition-colors"
+                  onClick={() => exportResults('excel')}
+                >
+                  Export as Excel
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {results.map((result, index) => (
+                  <div key={index} className="p-4 border rounded-lg shadow-sm bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 relative">
+                    {result.isAnalyzing && (
+                      <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 animate-pulse" />
+                    )}
+                    <div className="text-lg font-semibold text-gray-800 dark:text-white">
+                      <strong>Original URL:</strong>{' '}
+                      <a href={result.originalURL} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                        {result.originalURL}
+                      </a>
+                    </div>
+                    {result.error ? (
+                      <div className="mt-2 text-red-600 dark:text-red-400">Error: {result.error}</div>
+                    ) : (
+                      <>
+                        <div className="mt-2 text-gray-800 dark:text-white">
+                          <strong>Final URL:</strong>{' '}
+                          <a href={result.finalURL} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                            {result.finalURL}
+                          </a>
                         </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              ))}
+                        <div className="mt-2 text-gray-800 dark:text-white">
+                          <strong>Total Time:</strong>{' '}
+                          {result.totalTime !== undefined ? `${result.totalTime.toFixed(2)} seconds` : 'N/A'}
+                        </div>
+                        {result.redirectChain?.length > 0 && (
+                          <div className="mt-3">
+                            <button
+                              className="font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1"
+                              onClick={() => toggleChain(index)}
+                            >
+                              <span>Redirect Chain</span>
+                              <span>{expandedChains[index] ? '▼' : '▶'}</span>
+                            </button>
+                            {expandedChains[index] && (
+                              <div className="mt-2 space-y-4">
+                                {result.redirectChain.map((hop, idx) => (
+                                  <div key={idx} className="relative pl-10">
+                                    <div className="absolute left-4 top-0 w-6 h-6 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-300 font-semibold z-10">
+                                      {idx + 1}
+                                    </div>
+                                    {idx < result.redirectChain.length - 1 && (
+                                      <div className="absolute left-[1.65rem] top-6 h-[calc(100%-1rem)] w-0.5 bg-gray-300 dark:bg-gray-600" />
+                                    )}
+                                    <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg shadow-sm text-gray-800 dark:text-white">
+                                      <div className="truncate" title={hop.url}>
+                                        <strong>URL:</strong>{' '}
+                                        <a href={hop.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                          {hop.url}
+                                        </a>
+                                      </div>
+                                      <div>
+                                        <strong>Status:</strong>{' '}
+                                        <span className={`px-2 py-1 rounded ${
+                                          hop.status === 200 ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                                          hop.status >= 300 && hop.status < 400 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300' :
+                                          'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                                        }`}>
+                                          {hop.status ?? 'Unknown'}
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <strong>Server:</strong> {hop.server ?? 'Unknown'}
+                                      </div>
+                                      <div>
+                                        <strong>Time:</strong> {hop.timestamp !== undefined ? `${hop.timestamp.toFixed(2)}s` : 'N/A'}
+                                      </div>
+                                      {hop.error && <div className="text-red-600 dark:text-red-400">Error: {hop.error}</div>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Progress Sidebar (Right Side) */}
+        {isLoading && totalUrls > 0 && (
+          <div className="fixed right-0 top-0 h-full w-64 p-6 bg-gray-200 dark:bg-gray-800 shadow-lg z-20">
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Progress</h2>
+            <div className="mb-4">
+              <div className="w-full bg-gray-300 dark:bg-gray-600 rounded-full h-4">
+                <div
+                  className="bg-blue-600 dark:bg-blue-500 h-4 rounded-full"
+                  style={{ width: `${progressPercentage}%` }}
+                ></div>
+              </div>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
+                Analyzed: {analyzedUrls}/{totalUrls} URLs ({Math.round(progressPercentage)}% complete)
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                Remaining: {remainingUrls} URLs
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                ETA: {etaDisplay}
+              </p>
             </div>
           </div>
         )}
