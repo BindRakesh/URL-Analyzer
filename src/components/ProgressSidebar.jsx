@@ -4,9 +4,7 @@ import React from 'react';
 const ProgressSidebar = ({ totalUrls, analyzedUrls, averageTimePerUrl, actualTimeTaken, isLoading }) => {
   const progressPercentage = totalUrls > 0 ? (analyzedUrls / totalUrls) * 100 : 0;
   const remainingUrls = totalUrls - analyzedUrls;
-  const etaSeconds = remainingUrls * averageTimePerUrl;
-  const etaDisplay = etaSeconds > 0 ? `~${Math.ceil(etaSeconds)} seconds` : 'Calculating...';
-
+  
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
