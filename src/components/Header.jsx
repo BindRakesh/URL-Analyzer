@@ -1,5 +1,6 @@
 // src/components/Header.jsx
 import React from 'react';
+import '../styles/ToggleSwitch.css';
 
 const Header = ({ theme, toggleTheme }) => {
   return (
