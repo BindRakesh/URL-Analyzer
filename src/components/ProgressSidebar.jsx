@@ -38,14 +38,7 @@ const ProgressSidebar = ({ totalUrls, analyzedUrls, averageTimePerUrl, actualTim
         <p className="text-sm text-gray-700 dark:text-gray-300">
           Remaining: {remainingUrls} URLs
         </p>
-        {isLoading && (
-          <p className="text-sm text-gray-700 dark:text-gray-300">
-            ETA: {etaDisplay}
-          </p>
-        )}
-        <p className="text-sm text-gray-700 dark:text-gray-300">
-          Time Taken: {formatTime(actualTimeTaken)}
-        </p>
+
       </div>
     </div>
   );
