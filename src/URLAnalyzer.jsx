@@ -5,6 +5,7 @@ import Header from './components/Header';
 import InputForm from './components/InputForm';
 import ProgressSidebar from './components/ProgressSidebar';
 import ResultCard from './components/ResultCard';
+import '../styles/ToggleSwitch.css';
 
 const URLAnalyzer = () => {
   const [urls, setUrls] = useState('');
