@@ -42,6 +42,7 @@ const URLAnalyzer = () => {
     setTotalUrls(urlList.length);
 
     const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze';
+    // const backendUrl = 'ws://localhost:8080/analyze';
     const websocket = new WebSocket(backendUrl);
     wsRef.current = websocket;
 
