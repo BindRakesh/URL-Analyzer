@@ -41,8 +41,8 @@ const URLAnalyzer = () => {
     const urlList = urls.split('\n').filter(url => url.trim());
     setTotalUrls(urlList.length);
 
-    //  const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze'; //railway
-    const backendUrl = 'wss://url-analyzer-backend.onrender.com/analyze'; //render
+     const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze'; //railway
+    // const backendUrl = 'wss://url-analyzer-backend.onrender.com/analyze'; //render
     // const backendUrl = 'ws://localhost:8080/analyze'; //localhost
     const websocket = new WebSocket(backendUrl);
     wsRef.current = websocket;
