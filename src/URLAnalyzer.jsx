@@ -6,6 +6,7 @@ import InputForm from './components/InputForm';
 import ProgressSidebar from './components/ProgressSidebar';
 import ResultCard from './components/ResultCard';
 
+
 const URLAnalyzer = () => {
   const [urls, setUrls] = useState('');
   const [results, setResults] = useState([]);
