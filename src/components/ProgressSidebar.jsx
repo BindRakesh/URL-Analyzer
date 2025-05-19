@@ -5,11 +5,11 @@ const ProgressSidebar = ({ totalUrls, analyzedUrls, averageTimePerUrl, actualTim
   const progressPercentage = totalUrls > 0 ? (analyzedUrls / totalUrls) * 100 : 0;
   const remainingUrls = totalUrls - analyzedUrls;
   
-  const formatTime = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
-  };
+  // const formatTime = (seconds) => {
+  //   const minutes = Math.floor(seconds / 60);
+  //   const secs = Math.floor(seconds % 60);
+  //   return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+  // };
 
   return (
     <div className="md:fixed md:right-4 right-0 md:top-24 top-0 md:w-72 w-full p-6 bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-lg shadow-lg z-10 md:max-h-[calc(100vh-6rem)] max-h-full overflow-y-auto">
