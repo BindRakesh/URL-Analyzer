@@ -7,7 +7,7 @@ const InputForm = ({ urls, setUrls, analyzeURLs, pasteFromClipboard, isLoading }
   // Check if any URL contains "b2b"
   const hasB2B = (input) => {
     const urlList = input.split('\n').filter(url => url.trim() !== '');
-    return urlList.some(url => url.toLowerCase().includes('b2b'));
+    return urlList.some(url => url.toLowerCase().includes('b2b.bmw'));
   };
 
   // Handle URL input change with b2b validation
