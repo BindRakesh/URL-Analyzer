@@ -42,21 +42,17 @@ const URLAnalyzer = () => {
     const urlList = urls.split('\n').filter(url => url.trim());
     setTotalUrls(urlList.length);
 
-     const backendUrl = 'wss://url-analyzer-backend-1-production.up.railway.app/analyze';   //railway anil
-     //const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze'; //railway rakesh
-    // const backendUrl = 'wss://url-analyzer-backend.onrender.com/analyze'; //render
-    // const backendUrl = 'ws://localhost:8080/analyze'; //localhost
+    const backendUrl = 'ws://192.168.0.132:8080/analyze';
+
     const websocket = new WebSocket(backendUrl);
     wsRef.current = websocket;
 
     websocket.onopen = () => {
-      console.log("WebSocket connected");
       websocket.send(JSON.stringify({ urls: urlList }));
       setStartTime(Date.now());
     };
 
     websocket.onmessage = (event) => {
-      console.log("Received:", event.data);
       const data = JSON.parse(event.data);
       if (data.done) {
         setIsLoading(false);
@@ -117,23 +113,64 @@ const URLAnalyzer = () => {
 
   const exportResults = (format) => {
     if (format === 'excel') {
-      const workbook = XLSX.utils.book_new();
-      const worksheetData = results.flatMap((r, idx) =>
-        r.redirectChain.map((hop, hopIdx) => ({
-          'Result #': idx + 1,
+      const maxHops = results.reduce((max, r) => Math.max(max, r.redirectChain?.length || 0), 0);
+
+      const worksheetData = results.map(r => {
+        const row = {
           'Original URL': r.originalURL,
-          'Final URL': r.finalURL,
+          'Final URL': r.finalURL || 'N/A',
+          'Hop Count': r.redirectChain?.length || 0,
+          'Final Target Status': r.redirectChain?.[r.redirectChain.length - 1]?.status ?? 'N/A',
           'Total Time (s)': r.totalTime?.toFixed(2) || 'N/A',
-          'Hop #': hopIdx + 1,
-          'Hop URL': hop.url,
-          'Status': hop.status ?? 'Unknown',
-          'Server': hop.server ?? 'Unknown',
-          'Hop Time (s)': hop.timestamp?.toFixed(2) || 'N/A',
-        }))
-      );
+          'Error': r.error || '',
+        };
+
+        for (let i = 0; i < maxHops; i++) {
+          const hop = r.redirectChain?.[i];
+          if (hop) {
+            row[`Hop ${i + 1} URL`] = hop.url;
+            row[`Hop ${i + 1} Status`] = hop.status ?? 'Unknown';
+            row[`Hop ${i + 1} Server`] = hop.server ?? 'Unknown';
+          } else {
+            row[`Hop ${i + 1} URL`] = '';
+            row[`Hop ${i + 1} Status`] = '';
+            row[`Hop ${i + 1} Server`] = '';
+          }
+        }
+        
+        return row;
+      });
+
       const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+
+      // --- BEAUTIFICATION START ---
+      // Auto-fit column widths
+      const objectMaxLength = [];
+      const columnHeaders = Object.keys(worksheetData[0] || {});
+      
+      // Find the max length of the header
+      columnHeaders.forEach(header => {
+        objectMaxLength.push(header.length);
+      });
+
+      // Find the max length of the data in each column
+      worksheetData.forEach(data => {
+        Object.values(data).forEach((value, i) => {
+          const valueLength = value ? String(value).length : 0;
+          if (valueLength > objectMaxLength[i]) {
+            objectMaxLength[i] = valueLength;
+          }
+        });
+      });
+
+      // Add a little extra padding to the width
+      worksheet['!cols'] = objectMaxLength.map(width => ({ wch: width + 2 }));
+      // --- BEAUTIFICATION END ---
+
+      const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'URL Analysis');
       XLSX.writeFile(workbook, `url_analysis_${new Date().toISOString()}.xlsx`);
+
     } else {
       const dataStr = format === 'json'
         ? JSON.stringify(results, null, 2)
@@ -167,7 +204,6 @@ const URLAnalyzer = () => {
       <Header theme={theme} toggleTheme={toggleTheme} />
 
       <div className="flex-1 flex flex-col md:flex-row relative">
-        {/* Main Content */}
         <div className="p-6 max-w-4xl mx-auto w-full">
           <InputForm
             urls={urls}
@@ -227,7 +263,6 @@ const URLAnalyzer = () => {
           )}
         </div>
 
-        {/* Progress Sidebar */}
         {totalUrls > 0 && (
           <ProgressSidebar
             totalUrls={totalUrls}
@@ -239,7 +274,6 @@ const URLAnalyzer = () => {
         )}
       </div>
 
-      {/* Add CSS for the gradient animation */}
       <style>
         {`
           @keyframes gradientMove {
