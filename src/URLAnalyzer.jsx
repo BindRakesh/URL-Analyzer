@@ -42,7 +42,8 @@ const URLAnalyzer = () => {
     const urlList = urls.split('\n').filter(url => url.trim());
     setTotalUrls(urlList.length);
 
-    const backendUrl = 'ws://192.168.0.132:8080/analyze';
+    // const backendUrl = 'ws://192.168.0.132:8080/analyze';
+    const backendUrl = "wss://url-journey-backend.onrender.com/analyze"; //render-2
 
     const websocket = new WebSocket(backendUrl);
     wsRef.current = websocket;
