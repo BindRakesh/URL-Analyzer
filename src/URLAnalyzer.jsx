@@ -43,7 +43,12 @@ const URLAnalyzer = () => {
     setTotalUrls(urlList.length);
 
     // const backendUrl = 'ws://192.168.0.132:8080/analyze';
-    const backendUrl = "wss://url-journey-backend.onrender.com/analyze"; //render-2
+    // const backendUrl = "wss://url-journey-backend.onrender.com/analyze"; //render-2
+    const backendUrl = 'wss://url-analyzer-backend-1-production.up.railway.app/analyze';   //railway anil
+     //const backendUrl = 'wss://web-production-a69a9.up.railway.app/analyze'; //railway rakesh
+    // const backendUrl = 'wss://url-analyzer-backend.onrender.com/analyze'; //render
+    // const backendUrl = 'ws://localhost:8080/analyze'; //localhost
+    // const backendUrl = 'ws://192.168.0.132:8080/analyze';
 
     const websocket = new WebSocket(backendUrl);
     wsRef.current = websocket;
